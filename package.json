@@ -1,8 +1,8 @@
 {
   "name": "jest-nock-back",
   "version": "0.1.4",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
     "lodash": "^4.17.14"
   },
   "files": [
-    "./lib/index.js",
-    "./lib/index.d.ts"
+    "lib/index.js",
+    "lib/index.d.ts"
   ]
 }
