@@ -5,14 +5,12 @@ describe("e2e", () => {
     expect(true).toBe(true);
   });
 
-  it("should wrap an async fn", function(done) {
-    // console.log("not nocked", this);
+  it.nock("should wrap an async fn", function(done) {
     expect(false).toBe(false);
     done();
   });
 
-  (it as any).nock("should record fixtures for http calls", async () => {
-    // console.log("nocked", this);
+  it.nock("should record fixtures for http calls", async () => {
     const example = await Axios.get("https://example.com");
     expect(example.status).toBe(200);
     expect(example.data).toMatchSnapshot();

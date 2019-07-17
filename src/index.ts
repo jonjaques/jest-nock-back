@@ -7,6 +7,15 @@ import {
 } from "nock";
 import Path from "path";
 import { kebabCase } from "lodash";
+import * as jest from "jest";
+
+declare global {
+  namespace jest {
+    interface It {
+      nock: It;
+    }
+  }
+}
 
 const { TEST_MODE } = process.env;
 
