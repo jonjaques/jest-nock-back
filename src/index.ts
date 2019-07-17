@@ -11,16 +11,16 @@ import { kebabCase } from "lodash";
 const { TEST_MODE } = process.env;
 
 export interface IJestNockBackOptions {
-  defaultMode?: NockBackMode;
-  fixtureDir?: string;
+  defaultMode: NockBackMode;
+  fixtureDir: string;
   jasmine: any;
   global: any;
-  generateMockName?(
+  generateMockName(
     testTitle: string,
     testPath: string,
     fixtureDirectory: string
   ): string;
-  nock?: Partial<NockBackOptions>;
+  nock: Partial<NockBackOptions>;
 }
 
 const overrideMethods = [
@@ -115,7 +115,7 @@ function nockedTestFn(
     );
 
     // Open up fixture recording
-    const { nockDone, context } = await Nock(fixtureName);
+    const { nockDone, context } = await Nock(fixtureName, options.nock);
 
     // Start executing the test
     const ret = fn.call({ nock: context });
