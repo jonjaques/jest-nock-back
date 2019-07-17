@@ -140,9 +140,9 @@ function generateMockName(
 ) {
   const shortPath = Path.relative(fixtureDirectory, testPath);
   const testExt = Path.extname(shortPath);
-  const testPrefix = shortPath.replace("../", "");
+  const testPrefix = shortPath.replace("../", "").replace(testExt, "");
 
-  return kebabCase(`${shortPath} ${testTitle}`) + ".json";
+  return kebabCase(`${testPrefix} ${testTitle}`) + ".json";
 }
 
 function after(scope: Scope) {}
