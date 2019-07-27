@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`e2e should record fixtures for http calls 1`] = `
+exports[`jest test fns should record fixtures for http calls 1`] = `
 "<!doctype html>
 <html>
 <head>

@@ -1,6 +1,6 @@
 import Axios from "axios";
 
-describe("e2e", () => {
+describe("jest test fns", () => {
   it("should run", () => {
     expect(true).toBe(true);
   });
@@ -14,5 +14,15 @@ describe("e2e", () => {
     const example = await Axios.get("https://example.com");
     expect(example.status).toBe(200);
     expect(example.data).toMatchSnapshot();
+  });
+
+  describe("should do nested stuff", () => {
+    describe("nested", () => {
+      describe("nested once more", () => {
+        it.nock("make it so", () => {
+          expect("Riker").toBeTruthy();
+        });
+      });
+    });
   });
 });

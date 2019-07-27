@@ -7,15 +7,6 @@ import {
 } from "nock";
 import Path from "path";
 import { kebabCase } from "lodash";
-import * as jest from "jest";
-
-declare global {
-  namespace jest {
-    interface It {
-      nock: It;
-    }
-  }
-}
 
 const { TEST_MODE } = process.env;
 
@@ -27,6 +18,7 @@ export interface IJestNockBackOptions {
   generateMockName(
     testTitle: string,
     testPath: string,
+    reporter: Reporter,
     fixtureDirectory: string
   ): string;
   nock: Partial<NockBackOptions>;
@@ -41,6 +33,8 @@ const overrideMethods = [
   "afterAll",
   "afterEach"
 ];
+
+const addMethods = ["beforeAll", "beforeEach", "afterAll", "afterEach"];
 
 const optionDefaults: IJestNockBackOptions = {
   fixtureDir: "test/fixtures",
@@ -58,7 +52,7 @@ const optionDefaults: IJestNockBackOptions = {
 export function JestNockBack(options?: Partial<IJestNockBackOptions>) {
   const opts: IJestNockBackOptions = Object.assign({}, optionDefaults, options);
   const { jasmine, global: _global, fixtureDir, defaultMode } = opts;
-
+  // debugger;
   if (!jasmine || !_global) {
     throw new Error(
       "Must provide `jasmine` and `global` as options to this function!"
@@ -73,38 +67,75 @@ export function JestNockBack(options?: Partial<IJestNockBackOptions>) {
 
   const env = jasmine.getEnv();
   const testPath = jasmine.testPath;
+  const reporter = new Reporter();
+  env.addReporter(reporter);
 
   overrideMethods.forEach(method => {
-    _global[method].nock = bindNock(method, env[method], env, testPath, opts);
+    _global[method].nock = bindNock(
+      method,
+      env[method],
+      jasmine,
+      reporter,
+      testPath,
+      opts
+    );
   });
+
+  // addMethods.forEach(method => {
+  //   const newMethod = `nock${upcase(method)}`;
+  //   _global[newMethod] = _global[method] = bindNock(
+  //     newMethod,
+  //     _global[method],
+  //     jasmine,
+  //     reporter,
+  //     testPath,
+  //     opts
+  //   );
+  // });
 }
 
 function bindNock(
   method: string,
   fn: any,
-  env: any,
+  jasmine: any,
+  reporter: any,
   testPath: string,
   options: IJestNockBackOptions
 ) {
   return function test(...args: any[]) {
-    let [title, testFn, timeout] = args;
+    let title: string;
+    let testFn: Function;
+    let timeout: number;
 
-    // Handle beforeAll, etc
-    if (typeof title === "function") {
-      testFn = title;
+    const isLifecycle = args.length <= 2 && typeof args[0] === "function";
+
+    if (isLifecycle) {
+      testFn = args[0];
+      timeout = args[1];
       title = method;
+    } else {
+      title = args[0];
+      testFn = args[1];
+      timeout = args[2];
     }
 
     // Handle callback style tests
-    if (testFn && testFn.length) {
-      testFn = wrapTestFnCallbackWithPromise(testFn);
+    if (testFn! && testFn!.length) {
+      testFn = wrapTestFnCallbackWithPromise(testFn!);
     }
 
     // Replace the fn w/ our wrapped one
-    testFn = nockedTestFn(method, title, testFn, env, testPath, options);
+    testFn = nockedTestFn(
+      method,
+      title!,
+      testFn!,
+      jasmine,
+      reporter,
+      testPath,
+      options
+    );
 
-    // Return the test
-    return fn(title, testFn, timeout);
+    return isLifecycle ? fn(testFn, timeout!) : fn(title!, testFn, timeout!);
   };
 }
 
@@ -112,7 +143,8 @@ function nockedTestFn(
   method: string,
   title: string,
   fn: any,
-  env: any,
+  jasmine: any,
+  reporter: Reporter,
   testPath: string,
   options: IJestNockBackOptions
 ) {
@@ -120,8 +152,11 @@ function nockedTestFn(
     const fixtureName = options.generateMockName(
       title,
       testPath,
+      reporter,
       options.fixtureDir
     );
+
+    Nock.fixtures = Path.join(Path.dirname(testPath), "__fixtures__");
 
     // Open up fixture recording
     const { nockDone, context } = await Nock(fixtureName, options.nock);
@@ -145,13 +180,16 @@ function nockedTestFn(
 function generateMockName(
   testTitle: string,
   testPath: string,
+  reporter: Reporter,
   fixtureDirectory: string
 ) {
   const shortPath = Path.relative(fixtureDirectory, testPath);
   const testExt = Path.extname(shortPath);
   const testPrefix = shortPath.replace("../", "").replace(testExt, "");
-
-  return kebabCase(`${testPrefix} ${testTitle}`) + ".json";
+  const {
+    currentSpec: { fullName }
+  } = reporter;
+  return kebabCase(`${fullName}`) + ".json";
 }
 
 function after(scope: Scope) {}
@@ -177,4 +215,77 @@ function wrapTestFnCallbackWithPromise(testFn: Function) {
       });
     });
   };
+}
+
+interface ISuite {
+  id: string;
+  description: string;
+  fullName: string;
+  failedExpectations: any[];
+  testPath: string;
+}
+
+interface ISpec {
+  id: string;
+  description: string;
+  fullName: string;
+  failedExpectations: any[];
+  passedExpectations: any[];
+  pendingReason: string;
+  testPath: string;
+}
+
+class Reporter {
+  currentSpec!: ISpec;
+  currentSuite!: ISuite;
+  totalSpecsDefined!: number;
+  suites!: ISuite[];
+  specs!: ISpec[];
+
+  findSpec(id: string) {
+    return this.specs.find(s => s.id === id);
+  }
+
+  findSuite(id: string) {
+    return this.suites.find(s => s.id === id);
+  }
+
+  jasmineStarted(suiteInfo: any) {
+    this.totalSpecsDefined = suiteInfo.totalSpecsDefined;
+    this.suites = [];
+    this.specs = [];
+  }
+
+  suiteStarted(result: ISuite) {
+    const suite = this.findSuite(result.id);
+    if (!suite) {
+      this.suites.push(result);
+    }
+    this.currentSuite = { ...result };
+  }
+
+  specStarted(result: ISpec) {
+    const spec = this.findSpec(result.id);
+    if (!spec) {
+      this.specs.push(result);
+    }
+    this.currentSpec = { ...result };
+  }
+
+  specDone(result: ISpec) {
+    delete this.currentSpec;
+  }
+  suiteDone(result: ISuite) {
+    delete this.currentSuite;
+  }
+  jasmineDone() {
+    delete this.totalSpecsDefined;
+    delete this.suites;
+    delete this.specs;
+  }
+}
+
+function upcase(str: string) {
+  if (!str || !str.length) return str;
+  return str[0].toUpperCase() + str.slice(1);
 }
